@@ -1,0 +1,26 @@
+run
+compile
+run
+compile
+run
+compile
+run
+evicted
+compile
+run
+compile
+run
+If(IsZero(Pred(Pred(Succ(Succ(Zero))))),If(IsZero(Zero),True,False),False)
+If(IsZero(Pred(Succ(Zero))),If(IsZero(Zero),True,False),False)
+If(IsZero(Zero),If(IsZero(Zero),True,False),False)
+If(True,If(IsZero(Zero),True,False),False)
+If(IsZero(Zero),True,False)
+If(True,True,False)
+run
+if iszero pred 1 then true else false
+run
+if iszero pred 1 then true else false
+run
+pred succ succ succ false
+run
+compile
