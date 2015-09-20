@@ -1,0 +1,16 @@
+run
+exit
+run if iszero pred pred 2 then if iszero 0 then true else false else false
+if iszero pred pred 2 then if iszero 0 then true else false else fals
+run
+run   if true then t1 else t2
+run
+run   if true then 0 else 0
+run 
+isZero 0
+run 
+pred succ true
+run
+exit
+run
+exit
