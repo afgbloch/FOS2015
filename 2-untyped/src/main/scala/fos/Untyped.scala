@@ -10,7 +10,13 @@ import scala.util.parsing.input._
 object Untyped extends StandardTokenParsers {
   lexical.delimiters ++= List("(", ")", "\\", ".")
   import lexical.Identifier
-
+  
+  var id = 0;
+  def uniqId= {
+    id += 1
+    "a" + id
+  }
+  
   /** t ::= x
           | '\' x '.' t
           | t t
@@ -18,7 +24,7 @@ object Untyped extends StandardTokenParsers {
    */
   def term: Parser[Term] =
     expr ~ rep(expr) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} |
-    expr
+    expr 
    
    def expr =
      ident ^^ {case id => Var(id)} |
@@ -37,8 +43,11 @@ object Untyped extends StandardTokenParsers {
    *  @param t the given lambda abstraction.
    *  @return  the transformed term with bound variables renamed.
    */
-  def alpha(t: Term): Term =
-    ???
+  def alpha(t: Term): Term = t match {
+    case Abs(v, t1) => val newName = uniqId; rename
+  }
+  
+  def rename = ???
 
   /** Straight forward substitution method
    *  (see definition 5.3.5 in TAPL book).
@@ -49,8 +58,13 @@ object Untyped extends StandardTokenParsers {
    *  @param s the term we replace x with
    *  @return  ...
    */
-  def subst(t: Term, x: String, s: Term): Term =
-    ???
+  def subst(t: Term, x: String, s: Term): Term = t match {
+    case Var(name) if name == x => s 
+    case Var(name) => t
+    case Abs(v, t1) if v == x => t
+    case Abs(v, t1) => Abs(v, subst(t1, x, s))// fix for -> y belong to FV(s)
+    case App(t1, t2) => App(subst(t1, x, s),subst(t2, x, s))
+  }
 
   /** Term 't' does not match any reduction rule. */
   case class NoReductionPossible(t: Term) extends Exception(t.toString)
