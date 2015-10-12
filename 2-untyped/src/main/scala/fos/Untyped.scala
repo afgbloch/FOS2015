@@ -69,7 +69,9 @@ object Untyped extends StandardTokenParsers {
     case Var(name) if name == x => s 
     case Var(name) => t
     case Abs(v, t1) if v == x => t
-    case Abs(v, t1) => Abs(v, subst(t1, x, s))// fix for -> y belong to FV(s)
+    case Abs(v1, t1) => alpha(t) match{
+      case Abs(v2, t2) => Abs(v2, subst(t1, x, s))
+    }//Abs(v, subst(t1, x, s))// fix for -> y belong to FV(s)
     case App(t1, t2) => App(subst(t1, x, s),subst(t2, x, s))
   }
 
@@ -81,8 +83,10 @@ object Untyped extends StandardTokenParsers {
    *  @param t the initial term
    *  @return  the reduced term
    */
-  def reduceNormalOrder(t: Term): Term = {
-    ???
+  def reduceNormalOrder(t: Term): Term = t match {
+    case Var(name) => t
+    case Abs(v, t1) => ???
+    case App(t1, t2) => App(reduceNormalOrder(t1), reduceNormalOrder(t2))
   }
 
   /** Call by value reducer. */
