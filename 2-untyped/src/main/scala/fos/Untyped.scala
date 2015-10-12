@@ -44,13 +44,13 @@ object Untyped extends StandardTokenParsers {
    *  @return  the transformed term with bound variables renamed.
    */
   def alpha(t: Term): Term = t match {
-    case Abs(v, t1) => val newName = v + uniqId; rename(t1, v, newName)
+    case Abs(v, t1) => val newName = v + uniqId; Abs(newName,rename(t1, v, newName))
     case _=> t
   }
   
   def rename(t: Term, o:String, n:String): Term = t match {
-    case Abs(v, t1) if v == o => t
-    case Abs(v, t1) => rename(t1, o, n)
+    case Abs(v, _) if v == o => t
+    case Abs(_, t1) => rename(t1, o, n)
     case Var(name) if name == o => Var(n)
     case Var(name) => t
     case App(t1, t2) => App(rename(t1, o, n), rename(t2, o, n))
@@ -69,9 +69,9 @@ object Untyped extends StandardTokenParsers {
     case Var(name) if name == x => s 
     case Var(name) => t
     case Abs(v, t1) if v == x => t
-    case Abs(v1, t1) => alpha(t) match{
-      case Abs(v2, t2) => Abs(v2, subst(t1, x, s))
-    }//Abs(v, subst(t1, x, s))// fix for -> y belong to FV(s)
+    case Abs(_, _) => alpha(t) match{
+      case Abs(v2, t2) => Abs(v2, subst(t2, x, s))
+    }
     case App(t1, t2) => App(subst(t1, x, s),subst(t2, x, s))
   }
 
@@ -85,7 +85,8 @@ object Untyped extends StandardTokenParsers {
    */
   def reduceNormalOrder(t: Term): Term = t match {
     case Var(name) => t
-    case Abs(v, t1) => ???
+    case App(Abs(x, t1), t2) => subst(t1, x, t2)
+    case Abs(v, t1) => Abs(v, reduceNormalOrder(t1))
     case App(t1, t2) => App(reduceNormalOrder(t1), reduceNormalOrder(t2))
   }
 
