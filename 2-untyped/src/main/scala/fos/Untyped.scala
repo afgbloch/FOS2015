@@ -17,7 +17,13 @@ object Untyped extends StandardTokenParsers {
           | '(' t ')'
    */
   def term: Parser[Term] =
-    ???
+    expr ~ rep(expr) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} |
+    expr
+   
+   def expr =
+     ident ^^ {case id => Var(id)} |
+     "\\" ~ ident ~ "." ~ term ^^ { case l~id~dot~t => Abs(id, t)} |
+    "(" ~ term ~ ")" ^^ { case p1~t~p2 => t}
 
   /** <p>
    *    Alpha conversion: term <code>t</code> should be a lambda abstraction
