@@ -14,7 +14,7 @@ object Untyped extends StandardTokenParsers {
   var id = 0;
   def uniqId= {
     id += 1
-    "a" + id
+    id
   }
   
   /** t ::= x
@@ -44,10 +44,17 @@ object Untyped extends StandardTokenParsers {
    *  @return  the transformed term with bound variables renamed.
    */
   def alpha(t: Term): Term = t match {
-    case Abs(v, t1) => val newName = uniqId; rename
+    case Abs(v, t1) => val newName = v + uniqId; rename(t1, v, newName)
+    case _=> t
   }
   
-  def rename = ???
+  def rename(t: Term, o:String, n:String): Term = t match {
+    case Abs(v, t1) if v == o => t
+    case Abs(v, t1) => rename(t1, o, n)
+    case Var(name) if name == o => Var(n)
+    case Var(name) => t
+    case App(t1, t2) => App(rename(t1, o, n), rename(t2, o, n))
+  }
 
   /** Straight forward substitution method
    *  (see definition 5.3.5 in TAPL book).
@@ -74,8 +81,9 @@ object Untyped extends StandardTokenParsers {
    *  @param t the initial term
    *  @return  the reduced term
    */
-  def reduceNormalOrder(t: Term): Term =
+  def reduceNormalOrder(t: Term): Term = {
     ???
+  }
 
   /** Call by value reducer. */
   def reduceCallByValue(t: Term): Term =
