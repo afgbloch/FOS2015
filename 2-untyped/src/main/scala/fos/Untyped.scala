@@ -121,8 +121,6 @@ object Untyped extends StandardTokenParsers {
         result
     }
   }*/
-    
-    
   
   def reduceNormalOrder(t: Term): Term = t match {
     case Var(_) => throw NoReductionPossible(t)
@@ -132,16 +130,17 @@ object Untyped extends StandardTokenParsers {
     case App(t1, t2) => App(reduceNormalOrder(t1), t2)
   }
   
-  def reduceCallByValue(t: Term): Term = t match {
-    case Var(_) => throw NoReductionPossible(t)
-    case Abs(_, _) => throw NoReductionPossible(t)
-    case App(Abs(x, t1), t2@Abs(_, _)) => subst(t1, x, t2)
-    case App(Abs(x, t1), t2@Var(_)) => subst(t1, x, t2)
-    case App(t1@Abs(_, _), t2) => App(t1, reduceCallByValue(t2))
-    case App(t1, t2@Abs(_, _)) => App(reduceCallByValue(t1), t2)
-    case App(t1, t2) => App(reduceCallByValue(t1), reduceCallByValue(t2))
+  def isAValue(t: Term): Boolean = t match {
+    case Abs(_,_) => true
+    case _ => false
   }
   
+  def reduceCallByValue(t: Term): Term = t match {
+    case App(Abs(x, t1), t2) if isAValue(t2) => subst(t1, x, t2)
+    case App(t1, t2) if isAValue(t1) => App(t1, reduceCallByValue(t2))
+    case App(t1, t2) => App(reduceCallByValue(t1), t2)
+    case _ => throw NoReductionPossible(t)
+  }
 
   /** Call by value reducer. */
   /*def reduceCallByValue(t: Term): Term = {
