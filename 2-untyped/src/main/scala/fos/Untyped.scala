@@ -50,7 +50,7 @@ object Untyped extends StandardTokenParsers {
   
   def rename(t: Term, o:String, n:String): Term = t match {
     case Abs(v, _) if v == o => t
-    case Abs(_, t1) => rename(t1, o, n)
+    case Abs(v, t1) => Abs(v, rename(t1, o, n))
     case Var(name) if name == o => Var(n)
     case Var(name) => t
     case App(t1, t2) => App(rename(t1, o, n), rename(t2, o, n))
