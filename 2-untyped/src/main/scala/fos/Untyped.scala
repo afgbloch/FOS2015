@@ -84,50 +84,12 @@ object Untyped extends StandardTokenParsers {
    *  @param t the initial term
    *  @return  the reduced term
    */
-  /*def reduceNormalOrder(t: Term): Term = {
-    def inner(t: Term, opt: Boolean): Term = t match {
-      case Var(_) => t
-      case Abs(v, t1) => if(opt) {Abs(v, inner(t1,true))} else {t}
-      case App(t1,t2) => {
-        val t12: Term = inner(t1, false)//test
-        val t22: Term = inner(t2, true)
-        t12 match {
-          case Abs(x, t23) => inner(subst(t23, x, t2), true)
-          case _ => App(inner(t12,true), t22)
-        }
-      }
-    }
-    val result = inner(t,true)
-    if(t == result) {
-        throw NoReductionPossible(t)
-    }else {
-        result
-    }
-  }*/
-  
-  
-  /*def reduceNormalOrder(t: Term): Term = {
-    def inner(t: Term): Term = t match {
-      case Var(_) => t
-      case Abs(v, t1) => Abs(v, inner(t1))
-      case App(Abs(x, t1), t2) => subst(t1, x, t2)
-      case App(v@Var(_), t2) => App(v, inner(t2))
-      case App(t1, t2) => App(inner(t1), t2)
-    }
-    val result = inner(t)
-    if(t == result) {
-        throw NoReductionPossible(t)
-    }else {
-        result
-    }
-  }*/
-  
   def reduceNormalOrder(t: Term): Term = t match {
-    case Var(_) => throw NoReductionPossible(t)
     case Abs(v, t1) => Abs(v, reduceNormalOrder(t1))
     case App(Abs(x, t1), t2) => subst(t1, x, t2)
-    case App(v@Var(_), t2) => App(v, reduceNormalOrder(t2))
+    case App(v, t2) if(isReduce(v) == v) => App(v, reduceNormalOrder(t2))
     case App(t1, t2) => App(reduceNormalOrder(t1), t2)
+    case _ => throw NoReductionPossible(t)
   }
   
   def isAValue(t: Term): Boolean = t match {
@@ -135,34 +97,21 @@ object Untyped extends StandardTokenParsers {
     case _ => false
   }
   
+  def isReduce(t: Term): Term = t match {
+    case Abs(v, t1) => Abs(v, isReduce(t1))
+    case App(Abs(x, t1), t2) => subst(t1, x, t2)
+    case App(v, t2) if(isReduce(v) == v) => App(v, isReduce(t2))
+    case App(t1, t2) => App(isReduce(t1), t2)
+    case _ => t
+  }
+  
+  /** Call by value reducer. */
   def reduceCallByValue(t: Term): Term = t match {
     case App(Abs(x, t1), t2) if isAValue(t2) => subst(t1, x, t2)
     case App(t1, t2) if isAValue(t1) => App(t1, reduceCallByValue(t2))
     case App(t1, t2) => App(reduceCallByValue(t1), t2)
     case _ => throw NoReductionPossible(t)
   }
-
-  /** Call by value reducer. */
-  /*def reduceCallByValue(t: Term): Term = {
-      def inner(t: Term): Term = t match {
-        case Var(_) | Abs(_, _) => t
-        case App(t1, t2) => {
-          val t12: Term = inner(t1)
-          val t22: Term = inner(t2)
-          t12 match{
-            case Abs(x, t23) => inner(subst(t23, x, t22))
-            case _ => App(t12, t22)
-          }
-        }
-      }
-      val result = inner(t)
-      if(t == result) {
-        throw NoReductionPossible(t)
-      }else {
-        result
-      }
-  }*/
-
 
   /** Returns a stream of terms, each being one step of reduction.
    *
