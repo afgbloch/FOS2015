@@ -14,50 +14,57 @@ object SimplyTyped extends StandardTokenParsers {
 
   /** Term     ::= SimpleTerm { SimpleTerm }
    */
-  def Term: Parser[Term] =
+  def Term: Parser[Term] = functAppParser 
+    
+  def functAppParser: Parser[Term] = 
+      "fst" ~ AppParser ^^ { case f~t1 => First(t1)} |
+      "snd" ~ AppParser ^^ { case s~t1 => Second(t1)} |
+      AppParser
+    
+  def AppParser: Parser[Term] = 
     t ~ rep(t) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} | 
     t
+
+  def t: Parser[Term]= 
+    v |
+    "if" ~ Term ~ "then" ~ Term ~ "else" ~ Term ^^
+    { case i~condition~t~ifTerm~e~elseTerm => If(condition, ifTerm, elseTerm) } |
+    numericLit ^^ (x => unSugar(x.toInt)) |
+    "pred" ~ Term ^^ { case p~predecessor => Pred(predecessor) } |
+    "succ" ~ Term ^^ { case s~successor => Succ(successor) } |
+    "iszero" ~ Term ^^ { case z~zeroTerm => IsZero(zeroTerm) } |
+    ident ^^ {case id => Var(id)} |
+    "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t} |
+    "let" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^ { case l~i~c~ty~e~t1~in~t2 => App(Abs(i, ty, t2),t1)} |
+    "{" ~ Term ~ "," ~ Term ~ "}" ^^ { case  c1~t1~c2~t2~c3 => TermPair(t1,t2)} 
+
+
+  def v : Parser[Term] = 
+    "true" ^^^ True() |
+    "false" ^^^ False() |
+    nv |
+    "\\" ~ ident ~ ":" ~ Type ~ "." ~ Term ^^ { case l~id~col~ty~dot~term => Abs(id, ty, term)} |
+    "{" ~ v ~ "," ~ v ~ "}" ^^ { case c1~v1~c2~v2~c3 => TermPair(v1, v2)}
     
-    def t = 
-      v |
-      "if" ~ Term ~ "then" ~ Term ~ "else" ~ Term ^^
-      { case i~condition~t~ifTerm~e~elseTerm => If(condition, ifTerm, elseTerm) } |
-      numericLit ^^ (x => unSugar(x.toInt)) |
-      "pred" ~ Term ^^ { case p~predecessor => Pred(predecessor) } |
-      "succ" ~ Term ^^ { case s~successor => Succ(successor) } |
-      "iszero" ~ Term ^^ { case z~zeroTerm => IsZero(zeroTerm) } |
-      ident ^^ {case id => Var(id)} |
-      "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t} |
-      "let" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^ { case l~i~c~ty~e~t1~in~t2 => App(Abs(i, ty, t2),t1)}
-    
-    def v = 
-      "true" ^^^ True() |
-      "false" ^^^ False() |
-      nv |
-      "\\" ~ ident ~ ":" ~ Type ~ "." ~ Term ^^ { case l~id~col~ty~dot~term => Abs(id, ty, term)}
-    
-    def nv : Parser[Term] = 
-      "0" ^^^ Zero() |
-      "succ" ~ nv ^^ { case s~successor => Succ(successor) }
+  def nv : Parser[Term] = 
+    "0" ^^^ Zero() |
+    "succ" ~ nv ^^ { case s~successor => Succ(successor) }
       
-    def Type: Parser[Type] = 
-      T |
-      T ~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)}
-      //chainr1(T, "->" ^^^ ((a1,a2) => TypeFun(a1, a2)), (a1:Type,a2:Type) => TypeFun(a1, a2), ???)
+  def Type: Parser[Type] = funParse 
+      
+  def funParse: Parser[Type] = 
+    pairParse ~ "->" ~ pairParse ^^ { case t1~f~t2 => TypeFun(t1, t2)} |
+    pairParse
+     
+      
+  def pairParse: Parser[Type] = 
+    T ~ "*" ~ T ^^ { case t1~m~t2 => TypePair(t1, t2)} |
+    T
     
-    
-    
-    
-//    T ~ rep("->" ~ T) ^^ { case t1~ts => /*TypeFun(t1,*/ 
-//        ts.reduceRight{
-//          case (_,_) => ???//(f~a1,a2) => ???//TypeFun(a1, a2)
-//        }
-//        /*)*/}
-    
-    def T: Parser[Type] =
-      "Bool" ^^^ TypeBool|
-      "Nat" ^^^ TypeNat |
-      "(" ~ Type ~ ")" ^^ { case p1~t~p2 => t} 
+  def T: Parser[Type] =
+    "Bool" ^^^ TypeBool |
+    "Nat" ^^^ TypeNat |
+    "(" ~ Type ~ ")" ^^ { case p1~t~p2 => t}
       
        
       
