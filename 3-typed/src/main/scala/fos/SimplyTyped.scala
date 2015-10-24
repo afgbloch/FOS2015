@@ -27,7 +27,8 @@ object SimplyTyped extends StandardTokenParsers {
       "succ" ~ Term ^^ { case s~successor => Succ(successor) } |
       "iszero" ~ Term ^^ { case z~zeroTerm => IsZero(zeroTerm) } |
       ident ^^ {case id => Var(id)} |
-      "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t}
+      "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t} |
+      "let" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^ { case l~i~c~ty~e~t1~in~t2 => App(Abs(i, ty, t2),t1)}
     
     def v = 
       "true" ^^^ True() |
