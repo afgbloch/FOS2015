@@ -15,9 +15,67 @@ object SimplyTyped extends StandardTokenParsers {
   /** Term     ::= SimpleTerm { SimpleTerm }
    */
   def Term: Parser[Term] =
-    ???
-
-
+    t ~ rep(t) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} | 
+    t
+    
+    def t = 
+      v |
+      "if" ~ Term ~ "then" ~ Term ~ "else" ~ Term ^^
+      { case i~condition~t~ifTerm~e~elseTerm => If(condition, ifTerm, elseTerm) } |
+      numericLit ^^ (x => unSugar(x.toInt)) |
+      "pred" ~ Term ^^ { case p~predecessor => Pred(predecessor) } |
+      "succ" ~ Term ^^ { case s~successor => Succ(successor) } |
+      "iszero" ~ Term ^^ { case z~zeroTerm => IsZero(zeroTerm) } |
+      ident ^^ {case id => Var(id)} |
+      "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t}
+    
+    def v = 
+      "true" ^^^ True() |
+      "false" ^^^ False() |
+      nv |
+      "\\" ~ ident ~ ":" ~ Type ~ "." ~ Term ^^ { case l~id~col~ty~dot~term => Abs(id, ty, term)}
+    
+    def nv : Parser[Term] = 
+      "0" ^^^ Zero() |
+      "succ" ~ nv ^^ { case s~successor => Succ(successor) }
+      
+    def Type: Parser[Type] = 
+      T |
+      T ~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)}
+      //chainr1(T, "->" ^^^ ((a1,a2) => TypeFun(a1, a2)), (a1:Type,a2:Type) => TypeFun(a1, a2), ???)
+    
+    
+    
+    
+//    T ~ rep("->" ~ T) ^^ { case t1~ts => /*TypeFun(t1,*/ 
+//        ts.reduceRight{
+//          case (_,_) => ???//(f~a1,a2) => ???//TypeFun(a1, a2)
+//        }
+//        /*)*/}
+    
+    def T: Parser[Type] =
+      "Bool" ^^^ TypeBool|
+      "Nat" ^^^ TypeNat |
+      "(" ~ Type ~ ")" ^^ { case p1~t~p2 => t} 
+      
+       
+      
+  /**
+   * Helper function
+   * 
+   * Removes syntactic sugar such that a numeric literal 'x' is transformed into:
+   * 'x' * Succ(0).
+   */
+  def unSugar(numericLit : Int) : Term = numericLit match {
+    case 0 => Zero()
+    case x => Succ(unSugar(x - 1))
+  }
+  
+  var id = 0;
+  def uniqId= {
+    id += 1
+    id
+  }
 
   /** Thrown when no reduction rule applies to the given term. */
   case class NoRuleApplies(t: Term) extends Exception(t.toString)
@@ -31,9 +89,78 @@ object SimplyTyped extends StandardTokenParsers {
   /** The context is a list of variable names paired with their type. */
   type Context = List[(String, Type)]
 
+  def isAValue(t: Term): Boolean = t match {
+    case Abs(_,_, _) => true
+    case True() => true
+    case False() => true
+    case _ => isANumericValue(t)
+  }
+  
+    /**
+   * Helper function
+   * 
+   * Returns true if the given term t is 0 or of the form succ ..
+   */
+  def isANumericValue(t: Term): Boolean = t match {
+    case Zero() => true
+    case Succ(t1) => isANumericValue(t1)
+    case _ => false
+  }
+  
   /** Call by value reducer. */
-  def reduce(t: Term): Term =
-    ???
+	def reduce(t: Term): Term = t match {
+		  case If(True(), ifTerm, elseTerm) => ifTerm
+		  case If(False(), ifTerm, elseTerm) => elseTerm
+		  case IsZero(Zero()) => True()
+		  case IsZero(Succ(nv)) if isANumericValue(nv) => False()
+		  case Pred(Zero()) => Zero()
+		  case Pred(Succ(nv)) if isANumericValue(nv) => nv
+
+      case App(Abs(x, t3, t1), t2) if isAValue(t2) => subst(t1, x, t2)
+      
+		  case If(cond, ifTerm, elseTerm) => If(reduce(cond), ifTerm, elseTerm)
+		  case IsZero(t1) => IsZero(reduce(t1))
+      case Succ(t1) => Succ(reduce(t1))
+      case Pred(t1) => Pred(reduce(t1))
+
+      case App(t1, t2) if isAValue(t1) => App(t1, reduce(t2))
+      case App(t1, t2) => App(reduce(t1), t2)
+    
+		  case _ => throw NoRuleApplies(t)
+  }
+ 
+  def alpha(t: Term): Term = t match {
+    case Abs(v, t1, t2) => val newName = v + uniqId; Abs(newName, t1, rename(t2, v, newName))
+    case _=> t
+  }
+  
+  def rename(t: Term, o:String, n:String): Term = t match {
+    case Abs(v, _, _) if v == o => t
+    case Abs(v, t1, t2) => Abs(v, t1, rename(t2, o, n))
+    case Var(name) if name == o => Var(n)
+    case Var(name) => t
+    case App(t1, t2) => App(rename(t1, o, n), rename(t2, o, n))
+  }
+
+  /** Straight forward substitution method
+   *  (see definition 5.3.5 in TAPL book).
+   *  [x -> s]t
+   *
+   *  @param t the term in which we perform substitution
+   *  @param x the variable name
+   *  @param s the term we replace x with
+   *  @return  ...
+   */
+  def subst(t: Term, x: String, s: Term): Term = t match {
+    case Var(name) if name == x => s 
+    case Var(name) => t
+    case Abs(v, _, _) if v == x => t
+    case Abs(_, _, _) => alpha(t) match{
+      case Abs(v2, t1, t2) => Abs(v2, t1, subst(t2, x, s))
+      case _ => throw new InternalError
+    }
+    case App(t1, t2) => App(subst(t1, x, s),subst(t2, x, s))
+  }
 
 
   /** Returns the type of the given term <code>t</code>.
@@ -42,8 +169,48 @@ object SimplyTyped extends StandardTokenParsers {
    *  @param t   the given term
    *  @return    the computed type
    */
-  def typeof(ctx: Context, t: Term): Type =
-    ???
+  def typeof(ctx: Context, t: Term): Type = t match {
+    case True() => TypeBool 
+    case False() => TypeBool 
+    case Zero() => TypeNat
+    case Pred(t1) => 
+      if(typeof(ctx, t1) == TypeNat) {TypeNat} else { throw new TypeError(t , "expected TypeNat")}
+    case Succ(t1) => 
+      if(typeof(ctx, t1) == TypeNat) {TypeNat} else { throw new TypeError(t , "expected TypeNat")}
+    case IsZero(t1) => 
+      if(typeof(ctx, t1) == TypeNat) {TypeBool} else { throw new TypeError(t , "expected TypeNat")}
+    case If(cond, ifTerm, elseTerm) => {
+      val tCond = typeof(ctx, cond)
+      val tIf = typeof(ctx, ifTerm)
+      val tElse = typeof(ctx, elseTerm)
+
+      if(tCond == TypeBool && tIf == tElse) {
+        tIf
+      } else {
+        throw new TypeError(t, "failed if");
+      }
+    }
+    case Var(s) => ctx.find(_._1 == s).getOrElse(throw new TypeError(t , "expected TypeNat"))._2
+    
+    case Abs(x, typeX, t1) => {
+      val ctx2 = (x, typeX) :: ctx
+      val type1 = typeof(ctx2, t1)
+      TypeFun(typeX, type1)
+    }
+    
+    case App(t1, t2) => {
+      val type1 = typeof(ctx, t1)
+      val type2 = typeof(ctx, t2)
+      type1 match {
+        case TypeFun(type11, type12) => type2 match {
+          case type11 => type12
+          case _ => throw new TypeError(t , "failed App")
+        }
+        case _ => throw new TypeError(t , "failed App")
+      }
+    }
+    
+  }
 
 
   /** Returns a stream of terms, each being one step of reduction.
