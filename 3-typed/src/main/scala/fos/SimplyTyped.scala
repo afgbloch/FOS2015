@@ -12,17 +12,18 @@ object SimplyTyped extends StandardTokenParsers {
   lexical.reserved   ++= List("Bool", "Nat", "true", "false", "if", "then", "else", "succ",
                               "pred", "iszero", "let", "in", "fst", "snd")
 
-  /** Term     ::= SimpleTerm { SimpleTerm }
+  /** 
+   *  Term     ::= SimpleTerm { SimpleTerm }
    */
   def Term: Parser[Term] = functAppParser 
     
   def functAppParser: Parser[Term] = 
-      "fst" ~ AppParser ^^ { case f~t1 => First(t1)} |
-      "snd" ~ AppParser ^^ { case s~t1 => Second(t1)} |
+      "fst" ~ Term ^^ { case f~t1 => First(t1) } |
+      "snd" ~ Term ^^ { case s~t1 => Second(t1) } |
       AppParser
     
   def AppParser: Parser[Term] = 
-    t ~ rep(t) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} | 
+    t ~ rep(Term) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} | 
     t
 
   def t: Parser[Term]= 
@@ -36,7 +37,7 @@ object SimplyTyped extends StandardTokenParsers {
     ident ^^ {case id => Var(id)} |
     "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t} |
     "let" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^ { case l~i~c~ty~e~t1~in~t2 => App(Abs(i, ty, t2),t1)} |
-    "{" ~ Term ~ "," ~ Term ~ "}" ^^ { case  c1~t1~c2~t2~c3 => TermPair(t1,t2)} 
+    "{" ~ Term ~ "," ~ Term ~ "}" ^^ { case  c1~t1~c2~t2~c3 => TermPair(t1,t2)}
 
 
   def v : Parser[Term] = 
@@ -53,20 +54,18 @@ object SimplyTyped extends StandardTokenParsers {
   def Type: Parser[Type] = funParse 
       
   def funParse: Parser[Type] = 
-    pairParse ~ "->" ~ pairParse ^^ { case t1~f~t2 => TypeFun(t1, t2)} |
+    pairParse ~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)} |
     pairParse
      
       
   def pairParse: Parser[Type] = 
-    T ~ "*" ~ T ^^ { case t1~m~t2 => TypePair(t1, t2)} |
+    T ~ "*" ~ Type ^^ { case t1~m~t2 => TypePair(t1, t2)} |
     T
     
   def T: Parser[Type] =
     "Bool" ^^^ TypeBool |
     "Nat" ^^^ TypeNat |
-    "(" ~ Type ~ ")" ^^ { case p1~t~p2 => t}
-      
-       
+    "(" ~ Type ~ ")" ^^ { case p1~t~p2 => t} 
       
   /**
    * Helper function
@@ -211,7 +210,7 @@ object SimplyTyped extends StandardTokenParsers {
       val type2 = typeof(ctx, t2)
       type1 match {
         case TypeFun(type11, type12) => type2 match {
-          case type11 => type12
+          case t3 if (t3 == type11) => type12
           case _ => throw new TypeError(t , "failed App")
         }
         case _ => throw new TypeError(t , "failed App")
