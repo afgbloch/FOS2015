@@ -15,18 +15,16 @@ object SimplyTyped extends StandardTokenParsers {
   /** 
    *  Term     ::= SimpleTerm { SimpleTerm }
    */
-  def Term: Parser[Term] = functAppParser 
+  def Term: Parser[Term] = functAppParser | AppParser | expr
     
   def functAppParser: Parser[Term] = 
       "fst" ~ Term ^^ { case f~t1 => First(t1) } |
-      "snd" ~ Term ^^ { case s~t1 => Second(t1) } |
-      AppParser
+      "snd" ~ Term ^^ { case s~t1 => Second(t1) } 
     
   def AppParser: Parser[Term] = 
-    t ~ rep(Term) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} | 
-    t
+    expr ~ rep(functAppParser | expr) ^^ { case t1~t2 => t2.foldLeft(t1)((a1, a2) => App(a1, a2))} 
 
-  def t: Parser[Term]= 
+  def expr: Parser[Term]= 
     v |
     "if" ~ Term ~ "then" ~ Term ~ "else" ~ Term ^^
     { case i~condition~t~ifTerm~e~elseTerm => If(condition, ifTerm, elseTerm) } |
@@ -115,30 +113,40 @@ object SimplyTyped extends StandardTokenParsers {
   }
   
   /** Call by value reducer. */
-	def reduce(t: Term): Term = t match {
-		  case If(True(), ifTerm, elseTerm) => ifTerm
-		  case If(False(), ifTerm, elseTerm) => elseTerm
-		  case IsZero(Zero()) => True()
-		  case IsZero(Succ(nv)) if isANumericValue(nv) => False()
-		  case Pred(Zero()) => Zero()
-		  case Pred(Succ(nv)) if isANumericValue(nv) => nv
+  def reduce(t: Term): Term = t match {
+      case If(True(), ifTerm, elseTerm) => ifTerm
+      case If(False(), ifTerm, elseTerm) => elseTerm
+      case IsZero(Zero()) => True()
+      case IsZero(Succ(nv)) if isANumericValue(nv) => False()
+      case Pred(Zero()) => Zero()
+      case Pred(Succ(nv)) if isANumericValue(nv) => nv
 
       case App(Abs(x, t3, t1), t2) if isAValue(t2) => subst(t1, x, t2)
       
-		  case If(cond, ifTerm, elseTerm) => If(reduce(cond), ifTerm, elseTerm)
-		  case IsZero(t1) => IsZero(reduce(t1))
+      case If(cond, ifTerm, elseTerm) => If(reduce(cond), ifTerm, elseTerm)
+      case IsZero(t1) => IsZero(reduce(t1))
       case Succ(t1) => Succ(reduce(t1))
       case Pred(t1) => Pred(reduce(t1))
 
       case App(t1, t2) if isAValue(t1) => App(t1, reduce(t2))
       case App(t1, t2) => App(reduce(t1), t2)
+      
+      case First(TermPair(v1, v2)) => v1
+      case Second(TermPair(v1, v2)) => v2
+      case First(t1) => First(reduce(t1))
+      case Second(t1) => Second(reduce(t1))
+      case TermPair(v, t1) if isAValue(v) => TermPair(v, reduce(t1))
+      case TermPair(t1, t2) => TermPair(reduce(t1), t2)
     
-		  case _ => throw NoRuleApplies(t)
+      case _ => throw NoRuleApplies(t)
   }
- 
+  
+  
+  
+  
   def alpha(t: Term): Term = t match {
     case Abs(v, t1, t2) => val newName = v + uniqId; Abs(newName, t1, rename(t2, v, newName))
-    case _=> t
+    case _ => t
   }
   
   def rename(t: Term, o:String, n:String): Term = t match {
@@ -209,17 +217,26 @@ object SimplyTyped extends StandardTokenParsers {
       val type1 = typeof(ctx, t1)
       val type2 = typeof(ctx, t2)
       type1 match {
-        case TypeFun(type11, type12) => type2 match {
-          case t3 if (t3 == type11) => type12
-          case _ => throw new TypeError(t , "failed App")
-        }
-        case _ => throw new TypeError(t , "failed App")
+        case TypeFun(type11, type12) =>if(type2 == type11) {type12} else {throw new TypeError(t , "failed App 1:" + type11)}
+        case _ => throw new TypeError(t , "failed App 2")
       }
     }
     
-  }
-
-
+    case TermPair(t1, t2) => TypePair(typeof(ctx, t1),typeof(ctx, t2))
+    
+    case First(t1) => typeof(ctx, t1) match {
+      case TypePair(type1, _) => type1
+      case _ => throw new TypeError(t, "Expected TypePair")   
+    }
+      
+    case Second(t1) => typeof(ctx, t1) match {
+      case TypePair(_, type2) => type2
+      case _ => throw new TypeError(t, "Expected TypePair")   
+    }
+    
+    case _ => throw new TypeError(t, "Unknown Type")   
+  }  
+  
   /** Returns a stream of terms, each being one step of reduction.
    *
    *  @param t      the initial term
