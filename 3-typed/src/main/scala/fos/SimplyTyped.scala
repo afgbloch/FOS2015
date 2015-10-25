@@ -206,24 +206,37 @@ object SimplyTyped extends StandardTokenParsers {
     case True() => TypeBool 
     case False() => TypeBool 
     case Zero() => TypeNat
-    case Pred(t1) => 
-      if(typeof(ctx, t1) == TypeNat) {TypeNat} else { throw new TypeError(t , "expected TypeNat")}
-    case Succ(t1) => 
-      if(typeof(ctx, t1) == TypeNat) {TypeNat} else { throw new TypeError(t , "expected TypeNat")}
-    case IsZero(t1) => 
-      if(typeof(ctx, t1) == TypeNat) {TypeBool} else { throw new TypeError(t , "expected TypeNat")}
-    case If(cond, ifTerm, elseTerm) => {
-      val tCond = typeof(ctx, cond)
-      val tIf = typeof(ctx, ifTerm)
-      val tElse = typeof(ctx, elseTerm)
-
-      if(tCond == TypeBool && tIf == tElse) {
-        tIf
-      } else {
-        throw new TypeError(t, "failed if");
-      }
+    
+    case Pred(t1) => typeof(ctx, t1) match {
+      case TypeNat => TypeNat
+      case typ@_ => throw new TypeError(t, "[Pred] expected TypeNat but found " + typ)
     }
-    case Var(s) => ctx.find(_._1 == s).getOrElse(throw new TypeError(t , "expected TypeNat"))._2
+    
+    case Succ(t1) => typeof(ctx, t1) match {
+      case TypeNat => TypeNat
+      case typ@_ => throw new TypeError(t, "[Succ] expected TypeNat but found " + typ)
+    }
+    
+    case IsZero(t1) => typeof(ctx, t1) match {
+      case TypeNat => TypeBool
+      case typ@_ => throw new TypeError(t, "[IsZero] expected TypeNat but found " + typ)
+    }
+    
+    case If(cond, ifTerm, elseTerm) => typeof(ctx, cond) match {
+      case TypeBool => {
+        val tIf = typeof(ctx, ifTerm)
+        val tElse = typeof(ctx, elseTerm)
+        if (tIf == tElse) {
+          return tIf
+        } else {
+          throw new TypeError(t, "[If-Then-Else] branches have different types: " + tIf + " vs " + tElse)
+        }
+      }
+      case typ@_ => throw new TypeError(t, "[If-Then-Else] expected TypeBool as condition but found " + typ)
+    }
+    
+    case Var(s) => ctx.find(_._1 == s).getOrElse(
+        throw new TypeError(t, "[Var] variable " + s + " is not bounded by the current context"))._2
     
     case Abs(x, type1, t) => {
       val ctx2 = (x, type1) :: ctx
@@ -236,8 +249,9 @@ object SimplyTyped extends StandardTokenParsers {
       val type2 = typeof(ctx, t2)
       type1 match {
         case TypeFun(type11, type12) =>
-          if(type2 == type11) {type12} else {throw new TypeError(t , "failed App 1:" + type11)}
-        case _ => throw new TypeError(t , "failed App 2")
+          if (type2 == type11) {type12}
+          else {throw new TypeError(t, "[App] application has conflicting types: " + type2 + " vs " + type11)}
+        case typ@_ => throw new TypeError(t, "[App] expected TypeFun as left term type but found " + typ)
       }
     }
     
@@ -245,15 +259,15 @@ object SimplyTyped extends StandardTokenParsers {
     
     case First(t1) => typeof(ctx, t1) match {
       case TypePair(type1, _) => type1
-      case _ => throw new TypeError(t, "Expected TypePair")   
+      case typ@_ => throw new TypeError(t, "[First] expected TypePair but found " + typ)   
     }
       
     case Second(t1) => typeof(ctx, t1) match {
       case TypePair(_, type2) => type2
-      case _ => throw new TypeError(t, "Expected TypePair")   
+      case typ@_ => throw new TypeError(t, "[Second] expected TypePair but found " + typ)   
     }
     
-    case _ => throw new TypeError(t, "Unknown Type")   
+    case typ@_ => throw new TypeError(t, "Unknown Type => " + typ)   
   }  
   
   /** Returns a stream of terms, each being one step of reduction.
