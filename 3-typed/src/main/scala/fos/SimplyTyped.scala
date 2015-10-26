@@ -128,8 +128,8 @@ object SimplyTyped extends StandardTokenParsers {
     case App(t1, t2) if isAValue(t1) => App(t1, reduce(t2))
     case App(t1, t2) => App(reduce(t1), t2)
       
-    case First(TermPair(v1, v2)) => v1
-    case Second(TermPair(v1, v2)) => v2
+    case First(TermPair(v1, v2)) if (isAValue(v1) && isAValue(v2)) => v1
+    case Second(TermPair(v1, v2)) if (isAValue(v1) && isAValue(v2)) => v2
     case First(t1) => First(reduce(t1))
     case Second(t1) => Second(reduce(t1))
     case TermPair(v1, t2) if isAValue(v1) => TermPair(v1, reduce(t2))
