@@ -154,14 +154,14 @@ object SimplyTyped extends StandardTokenParsers {
     case App(t1, t2) => App(rename(t1, o, n), rename(t2, o, n))
     case First(t1) => First(rename(t1, o, n))
     case Second(t1) => Second(rename(t1, o, n))
-    case TermPair(t1, t2) => TermPair(rename(t1, o, n), rename(t1, o, n))
+    case TermPair(t1, t2) => TermPair(rename(t1, o, n), rename(t2, o, n))
     case IsZero(t1) => IsZero(rename(t1, o, n))
     case Zero() => t
     case True() => t
     case False() => t
     case Succ(t1) => Succ(rename(t1, o, n))
     case Pred(t1) => Pred(rename(t1, o, n))
-    case If(cond, t1, t2) => If(rename(cond, o, n), rename(t1, o, n), rename(t1, o, n))
+    case If(cond, t1, t2) => If(rename(cond, o, n), rename(t1, o, n), rename(t2, o, n))
     case _ => throw new InternalError
   }
 
