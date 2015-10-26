@@ -48,16 +48,13 @@ object SimplyTyped extends StandardTokenParsers {
     "0" ^^^ Zero() |
     "succ" ~ nv ^^ { case s~successor => Succ(successor) }
       
-  def Type: Parser[Type] = funParse 
+  def Type: Parser[Type] = funParse | pairParse | T
       
   def funParse: Parser[Type] = 
-    pairParse ~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)} |
-    pairParse |
-    failure("Illegal start of simple term")
+    (pairParse | T)~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)}
      
   def pairParse: Parser[Type] = 
-    T ~ "*" ~ Type ^^ { case t1~m~t2 => TypePair(t1, t2)} |
-    T
+    T ~ rep("*" ~ T) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) }  
     
   def T: Parser[Type] =
     "Bool" ^^^ TypeBool |
