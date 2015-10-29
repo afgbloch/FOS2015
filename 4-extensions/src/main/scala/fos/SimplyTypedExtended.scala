@@ -353,11 +353,10 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case Case(t0,x1,t1,x2,t2) => {
       typeof(ctx, t0) match {
         case TypeSum(tpe1, tpe2) => {
-          val ctx2 = (x1, tpe1) ::  (x2, tpe2) :: ctx
-          val type1 = typeof(ctx2, t1)
-          val type2 = typeof(ctx2, t2)
+          val type1 = typeof((x1, tpe1) :: ctx, t1)
+          val type2 = typeof((x2, tpe2) :: ctx, t2)
           if(type1 == type2){
-            return type1
+            type1
           } else {
             throw new TypeError(t, "[Case] invalid TypeSum" + type1 + "!=" + type2)
           }
