@@ -200,7 +200,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case Pred(t1) => Pred(rename(t1, o, n))
     case If(cond, t1, t2) => If(rename(cond, o, n), rename(t1, o, n), rename(t2, o, n))
     case Inr(t1, tpe) => Inr(rename(t1, o, n), tpe)
-    case Inl(t1, tpe) => Inr(rename(t1, o, n), tpe)
+    case Inl(t1, tpe) => Inl(rename(t1, o, n), tpe)
     case Fix(t1) => Fix(rename(t1, o, n))
     case Case(t0, x1, t1, x2, t2) => Case(rename(t0, o, n), x1, rename(t1, o, n), x2, rename(t2, o, n))
     case _ => throw new InternalError
@@ -241,6 +241,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case _ => throw new InternalError
     }
     case Fix(t1) => subst(t1, x, s)
+    
     case _ => throw new InternalError
   }
  
