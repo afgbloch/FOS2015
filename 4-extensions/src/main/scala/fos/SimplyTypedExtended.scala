@@ -100,9 +100,14 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   /** 
    *  SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
    */
-  def SimpleType: Parser[Type] =
-    BaseType ~ rep("*" ~ BaseType) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) } |
-    BaseType ~ rep("+" ~ BaseType) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypeSum(a1, a2)) } 
+  def SimpleType: Parser[Type] = test1 | test2
+    
+  def test1: Parser[Type] =
+    BaseType ~ rep("*" ~ BaseType | "*" ~ test2) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) }
+  
+  def test2: Parser[Type] = 
+    BaseType ~ rep("+" ~ BaseType | "+" ~ test1) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypeSum(a1, a2)) }
+    
   /** 
    *  BaseType ::= "Bool" | "Nat" | "(" Type ")"
    */
@@ -149,11 +154,25 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case TermPair(v1, t2) if isAValue(v1) => TermPair(v1, reduce(t2))
     case TermPair(t1, t2) => TermPair(reduce(t1), t2)
     
+    case Case(Inl(v0, tpe), x1, t1, x2, t2) if isAValue(v0) => subst(t1, x1, v0)
+    case Case(Inr(v0, tpe), x1, t1, x2, t2) if isAValue(v0) => subst(t2, x2, v0)
+    case Case(t0, x1, t1, x2, t2) => Case(reduce(t0), x1, t1, x2, t2)
+    case Inl(t1, tpe) => Inl(reduce(t1), tpe)
+    case Inr(t1, tpe) => Inr(reduce(t1), tpe)
+    
+    case Fix(Abs(x, t1, t2)) => subst(t2, x, t)
+    case Fix(t1) => Fix(reduce(t1))
+    
     case _ => throw NoRuleApplies(t)
   }
   
   def alpha(t: Term): Term = t match {
     case Abs(v, t1, t2) => val newName = v + uniqId; Abs(newName, t1, rename(t2, v, newName))
+    case Case(t0, x1, t1, x2, t2) =>{
+      val newName1 = x1 + uniqId 
+      val newName2 = x2 + uniqId
+      Case(t0, newName1, rename(t1, x1, newName1), newName2, rename(t2, x2, newName2))
+    }
     case _ => t
   }
   
@@ -179,6 +198,10 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case Succ(t1) => Succ(rename(t1, o, n))
     case Pred(t1) => Pred(rename(t1, o, n))
     case If(cond, t1, t2) => If(rename(cond, o, n), rename(t1, o, n), rename(t2, o, n))
+    case Inr(t1, tpe) => Inr(rename(t1, o, n), tpe)
+    case Inl(t1, tpe) => Inr(rename(t1, o, n), tpe)
+    case Fix(t1) => Fix(rename(t1, o, n))
+    case Case(t0, x1, t1, x2, t2) => Case(rename(t0, o, n), x1, rename(t1, o, n), x2, rename(t2, o, n))
     case _ => throw new InternalError
   }
   
@@ -210,6 +233,13 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case Succ(t1) => Succ(subst(t1, x, s))
     case Pred(t1) => Pred(subst(t1, x, s))
     case If(cond, t1, t2) => If(subst(cond, x, s), subst(t1, x, s), subst(t2, x, s))
+    case Inl(t1, tpe1) => Inl(subst(t1, x, s), tpe1)
+    case Inr(t1, tpe1) => Inr(subst(t1, x, s), tpe1)
+    case Case(t0, x1, t1, x2, t2) => alpha(t) match{
+      case Case(t0, x1, t1, x2, t2) => Case(subst(t0, x, s), x1, subst(t1, x, s), x2, subst(t2, x, s))
+      case _ => throw new InternalError
+    }
+    case Fix(t1) => subst(t1, x, s)
     case _ => throw new InternalError
   }
  
@@ -230,6 +260,8 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case True() => true
     case False() => true
     case TermPair(x, y) => isAValue(x) && isAValue(y)
+    case Inl(v1, t1) => isAValue(v1)
+    case Inr(v1, t1) => isAValue(v1)
     case _ => isANumericValue(t)
   }
   
