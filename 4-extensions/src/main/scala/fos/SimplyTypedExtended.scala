@@ -2,6 +2,7 @@ package fos
 
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 import scala.util.parsing.input._
+import scala.collection.immutable.Nil
 
 /** This object implements a parser and evaluator for the
  *  simply typed lambda calculus found in Chapter 9 of
@@ -59,7 +60,18 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     ident ^^ {case id => Var(id)} |
     "(" ~ Term ~ ")" ^^ { case p1~t~p2 => t} |
     "let" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^ { case l~i~c~ty~e~t1~in~t2 => App(Abs(i, ty, t2),t1)} |
-    "{" ~ Term ~ "," ~ Term ~ "}" ^^ { case  c1~t1~c2~t2~c3 => TermPair(t1,t2)}
+    "{" ~ Term ~ "," ~ Term ~ "}" ^^ { case  c1~t1~c2~t2~c3 => TermPair(t1,t2)} |
+    "inl" ~ Term ~ "as" ~ Type ^^ { case c1~t1~c2~tpe => Inl(t1, tpe) } |
+    "inr" ~ Term ~ "as" ~ Type ^^ { case c1~t1~c2~tpe => Inr(t1, tpe) } |
+    "case" ~ Term ~ "of" ~ "inl" ~ ident ~ "=>" ~ Term ~ "|" ~ "inr" ~ ident ~ "=>" ~ Term ^^
+      { case c1~t1~c2~c3~i1~c4~t2~c5~c6~i2~c8~t3 => Case(t1, i1, t2, i2, t3)} |
+    "fix" ~ Term ^^ { case c1~t1 => Fix(t1)} |
+    "letrec" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^
+      { case c1~i1~c2~tpe~c3~t1~c4~t2 => App(Abs(i1, tpe, t2), Fix(Abs(i1, tpe, t1)))}
+//    letrec x: T1 = t1 in t2  ⇒  let x = fix (λx: T1. t1) in t2 
+    //let x: T = fix (λx: T1. t1) in t2 => (λx:T. t2) fix (λx: T1. t1)
+    //let x: T = t1 in t2 => (λx:T. t2) t1
+//      "fix" t/
 
 
   def v : Parser[Term] = 
@@ -67,13 +79,17 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     "false" ^^^ False() |
     nv |
     "\\" ~ ident ~ ":" ~ Type ~ "." ~ Term ^^ { case l~id~col~ty~dot~term => Abs(id, ty, term)} |
-    "{" ~ v ~ "," ~ v ~ "}" ^^ { case c1~v1~c2~v2~c3 => TermPair(v1, v2)}
+    "{" ~ v ~ "," ~ v ~ "}" ^^ { case c1~v1~c2~v2~c3 => TermPair(v1, v2)} |
+    "inl" ~ v ~ "as" ~ Type ^^ { case c1~t1~c2~tpe => Inl(t1, tpe) } |
+    "inr" ~ v ~ "as" ~ Type ^^ { case c1~t1~c2~tpe => Inr(t1, tpe) } 
+
     
   def nv : Parser[Term] = 
     "0" ^^^ Zero() |
     "succ" ~ nv ^^ { case s~successor => Succ(successor) }
 
-  /** Type       ::= SimpleType [ "->" Type ]
+  /** 
+   *  Type       ::= SimpleType [ "->" Type ]
    */
   def Type: Parser[Type] = funParse | SimpleType | BaseType
     
@@ -81,12 +97,14 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   def funParse: Parser[Type] =
     (SimpleType | BaseType)~ "->" ~ Type ^^ { case t1~f~t2 => TypeFun(t1, t2)}
 
-  /** SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
+  /** 
+   *  SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
    */
   def SimpleType: Parser[Type] =
-    BaseType ~ rep("*" ~ BaseType) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) }
-
-  /** BaseType ::= "Bool" | "Nat" | "(" Type ")"
+    BaseType ~ rep("*" ~ BaseType) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) } |
+    BaseType ~ rep("+" ~ BaseType) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypeSum(a1, a2)) } 
+  /** 
+   *  BaseType ::= "Bool" | "Nat" | "(" Type ")"
    */
   def BaseType: Parser[Type] =
     "Bool" ^^^ TypeBool |
@@ -297,6 +315,51 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case Second(t1) => typeof(ctx, t1) match {
       case TypePair(_, type2) => type2
       case typ@_ => throw new TypeError(t, "[Second] expected TypePair but found " + typ)   
+    }
+    
+    case Case(t0,x1,t1,x2,t2) => {
+      typeof(ctx, t0) match {
+        case TypeSum(tpe1, tpe2) => {
+          val ctx2 = (x1, tpe1) ::  (x2, tpe2) :: ctx
+          val type1 = typeof(ctx2, t1)
+          val type2 = typeof(ctx2, t2)
+          if(type1 == type2){
+            return type1
+          } else {
+            throw new TypeError(t, "[Case] invalid TypeSum" + type1 + "!=" + type2)
+          }
+        }
+        case typ@_ => throw new TypeError(t, "[Case] expected TypeSum but found " + typ)   
+      }
+    }
+    
+    case Inl(t1, tpe1) => tpe1 match {
+      case TypeSum(type1, type2) => {
+        val t1Tpe = typeof(ctx, t1)
+        if(t1Tpe == type1) {
+          tpe1
+        } else {
+          throw new TypeError(t, "[Inl] expected " + type1 + " but found " + t1Tpe)
+        }
+      }
+      case typ@_ => throw new TypeError(t, "[Inl] expected TypeSum but found " + typ)
+    }
+    
+    case Inr(t1, tpe1) =>  tpe1 match {
+      case TypeSum(type1, type2) => {
+        val t1Tpe = typeof(ctx, t1)
+        if(t1Tpe == type2) {
+          tpe1
+        } else {
+          throw new TypeError(t, "[Inl] expected " + type2 + " but found " + t1Tpe)
+        }
+      }
+      case typ@_ => throw new TypeError(t, "[Inl] expected TypeSum but found " + typ)
+    }
+    
+    case Fix(t1) => typeof(ctx, t1) match {
+      case TypeFun(type1, type2) if (type1 == type2) => type1
+      case typ@_ => throw new TypeError(t, "[Inl] expected TypeFun of same type but found " + typ)
     }
     
     case typ@_ => throw new TypeError(t, "Unknown Type => " + typ)   
