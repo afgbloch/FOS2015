@@ -68,10 +68,6 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     "fix" ~ Term ^^ { case c1~t1 => Fix(t1)} |
     "letrec" ~ ident ~ ":" ~ Type ~ "=" ~ Term ~ "in" ~ Term ^^
       { case c1~i1~c2~tpe~c3~t1~c4~t2 => App(Abs(i1, tpe, t2), Fix(Abs(i1, tpe, t1)))}
-//    letrec x: T1 = t1 in t2  ⇒  let x = fix (λx: T1. t1) in t2 
-    //let x: T = fix (λx: T1. t1) in t2 => (λx:T. t2) fix (λx: T1. t1)
-    //let x: T = t1 in t2 => (λx:T. t2) t1
-//      "fix" t/
 
 
   def v : Parser[Term] = 
@@ -100,13 +96,18 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   /** 
    *  SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
    */
-  def SimpleType: Parser[Type] = test1 | test2
-    
-  def test1: Parser[Type] =
-    BaseType ~ rep("*" ~ BaseType | "*" ~ test2) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypePair(a1, a2)) }
-  
-  def test2: Parser[Type] = 
-    BaseType ~ rep("+" ~ BaseType | "+" ~ test1) ^^ { case t1~t2 => (t1 :: (t2.map(_._2))).reduceRight((a1, a2) => TypeSum(a1, a2)) }
+  def SimpleType: Parser[Type] = 
+    BaseType ~ rep("*" ~ BaseType | "+" ~ BaseType) ^^
+    {
+      case t1 ~ t2 =>
+        {
+          val e: List[(String, Type)] = (("", t1) :: t2.map { case x => (x._1, x._2) })
+          e.reduceRight[(String, Type)] {
+            case ((s1, a1), (s2, a2)) if (s2 == "+") => (s1, TypeSum(a1, a2))
+            case ((s1, a1), (s2, a2)) if (s2 == "*") => (s1, TypePair(a1, a2))
+          }
+        }._2
+    }
     
   /** 
    *  BaseType ::= "Bool" | "Nat" | "(" Type ")"
