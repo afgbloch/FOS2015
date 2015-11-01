@@ -359,7 +359,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
           if(type1 == type2){
             type1
           } else {
-            throw new TypeError(t, "[Case] invalid TypeSum" + type1 + "!=" + type2)
+            throw new TypeError(t2, "[Case] invalid TypeSum" + type1 + "!=" + type2)
           }
         }
         case typ@_ => throw new TypeError(t, "[Case] expected TypeSum but found " + typ)   
