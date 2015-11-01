@@ -359,7 +359,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
           if(type1 == type2){
             type1
           } else {
-            throw new TypeError(t, "[Case] invalid TypeSum" + type1 + "!=" + type2)
+            throw new TypeError(t, "[Case] invalid TypeSum " + type1 + " != " + type2)
           }
         }
         case typ@_ => throw new TypeError(t, "[Case] expected TypeSum but found " + typ)   
@@ -384,15 +384,15 @@ object SimplyTypedExtended extends  StandardTokenParsers {
         if(t1Tpe == type2) {
           tpe1
         } else {
-          throw new TypeError(t, "[Inl] expected " + type2 + " but found " + t1Tpe)
+          throw new TypeError(t, "[Inr] expected " + type2 + " but found " + t1Tpe)
         }
       }
-      case typ@_ => throw new TypeError(t, "[Inl] expected TypeSum but found " + typ)
+      case typ@_ => throw new TypeError(t, "[Inr] expected TypeSum but found " + typ)
     }
     
     case Fix(t1) => typeof(ctx, t1) match {
       case TypeFun(type1, type2) if (type1 == type2) => type1
-      case typ@_ => throw new TypeError(t, "[Inl] expected TypeFun of same type but found " + typ)
+      case typ@_ => throw new TypeError(t, "[Fix] expected TypeFun of same type but found " + typ)
     }
     
     case typ@_ => throw new TypeError(t, "Unknown Type => " + typ)   
