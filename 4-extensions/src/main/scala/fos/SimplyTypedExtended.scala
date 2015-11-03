@@ -236,11 +236,11 @@ object SimplyTypedExtended extends  StandardTokenParsers {
     case If(cond, t1, t2) => If(subst(cond, x, s), subst(t1, x, s), subst(t2, x, s))
     case Inl(t1, tpe1) => Inl(subst(t1, x, s), tpe1)
     case Inr(t1, tpe1) => Inr(subst(t1, x, s), tpe1)
-    case Case(t0, x1, t1, x2, t2) => alpha(t) match{
+    case Case(_, _, _, _, _) => alpha(t) match{
       case Case(t0, x1, t1, x2, t2) => Case(subst(t0, x, s), x1, subst(t1, x, s), x2, subst(t2, x, s))
       case _ => throw new InternalError
     }
-    case Fix(t1) => subst(t1, x, s)
+    case Fix(t1) => Fix(subst(t1, x, s))
     
     case _ => throw new InternalError
   }
