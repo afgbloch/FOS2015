@@ -21,6 +21,12 @@ object Infer {
     case FunTypeTree(tpe1, tpe2) => FunType(typeCast(tpe1), typeCast(tpe2))
     case _ => throw new InternalError
   }
+  
+  def extract(tpe: Type, env: Env, lvar:List[TypeVar]): List[TypeVar] = tpe match {
+    case FunType(tpe1, tpe2) => extract(tpe2, env, extract(tpe1, env, lvar))
+    case e@TypeVar(name) => lvar//FIX ME
+    case _ => lvar
+  }
 
   def collect(env: Env, t: Term): (Type, List[Constraint]) = t match {
     case True() => (BoolType, List())
@@ -46,7 +52,7 @@ object Infer {
       (tpe2, ct)
     }
     
-    case Var(name) => {
+    case Var(name) => { // change for instantiat  time
       val tpe = env.filter(e => e._1 == name).map(e => e._2).head.tp
       (tpe, List())
     }
@@ -72,7 +78,21 @@ object Infer {
       (tpeX, ct)
     }
     
-    case Let(x, tp, v, t1) => ???
+    case Let(x, tpe1, v, t1) => {
+      val (s1, c) = collect(env, v)
+      def f1 = unify(c)
+  
+      val s2 = f1(s1)
+      
+      //apply f1 to env
+      
+      
+      val lvar = extract(s2, env, Nil)
+      val ts = TypeScheme(lvar ,s2)
+      val env2 = (x , ts) :: env
+      val (tpe2, ct) = collect(env2, t1)
+      (tpe2, ct)
+    }
     case _ => throw new InternalError
   }
   
