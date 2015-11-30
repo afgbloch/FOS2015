@@ -24,8 +24,27 @@ object Infer {
   
   def extract(tpe: Type, env: Env, lvar:List[TypeVar]): List[TypeVar] = tpe match {
     case FunType(tpe1, tpe2) => extract(tpe2, env, extract(tpe1, env, lvar))
-    case e@TypeVar(name) => lvar//FIX ME
+    case e@TypeVar(name) => {
+      if(!env.exists(x => appear(e, x._2.tp))){
+        e :: lvar
+      } else {lvar}
+    }
     case _ => lvar
+  }
+  
+  def instantiate(ts: TypeScheme): Type = {
+    val lName = ts.params.map { x => (x, TypeVar(freshType)) }
+        
+    def rename(tpe:Type): Type = tpe match {
+      case FunType(tpe1, tpe2) => FunType(rename(tpe1), rename(tpe2))
+      case tv1@TypeVar(name) => lName.find(x => x._1.name == name) match {
+        case Some(tv2) => tv2._2
+        case None =>  tv1
+      }
+      case _ => tpe
+    }
+    
+    rename(ts.tp)
   }
 
   def collect(env: Env, t: Term): (Type, List[Constraint]) = t match {
@@ -52,20 +71,18 @@ object Infer {
       (tpe2, ct)
     }
     
-    case Var(name) => { // change for instantiat  time
-      val tpe = env.filter(e => e._1 == name).map(e => e._2).head.tp
-      (tpe, List())
+    case Var(name) => {
+      val ts = env.filter(e => e._1 == name).map(e => e._2).head
+      (instantiate(ts), List())
     }
     
     case Abs(x, treeTp1, t1) => {
-      var lVar : List[TypeVar] = List()
-      
       val tpe1 = treeTp1 match {
-        case EmptyTypeTree() => val tmpTpe = TypeVar(freshType); lVar = tmpTpe :: lVar; tmpTpe 
+        case EmptyTypeTree() => TypeVar(freshType)
         case _ => typeCast(treeTp1)
       }
       
-      val env2 = (x, TypeScheme(lVar, tpe1)) :: env
+      val env2 = (x, TypeScheme(List(), tpe1)) :: env
       val (tpe2, ct) = collect(env2, t1)
       (FunType(tpe1, tpe2), ct)
     }
@@ -78,21 +95,29 @@ object Infer {
       (tpeX, ct)
     }
     
-    case Let(x, tpe1, v, t1) => {
+    case Let(x, EmptyTypeTree(), v, t1) => {
       val (s1, c) = collect(env, v)
       def f1 = unify(c)
   
       val s2 = f1(s1)
       
-      //apply f1 to env
+      var env2 = env.map {
+        case x => {
+          val params2 = x._2.params.map(x => f1(x)).asInstanceOf[List[TypeVar]]
+          (x._1, TypeScheme(params2, f1(x._2.tp)))
+          
+        }
+      }
       
-      
-      val lvar = extract(s2, env, Nil)
-      val ts = TypeScheme(lvar ,s2)
-      val env2 = (x , ts) :: env
+      env2 = (x , TypeScheme(extract(s2, env2, Nil), s2)) :: env2
       val (tpe2, ct) = collect(env2, t1)
       (tpe2, ct)
     }
+    
+    case Let(x, tpe, t1, t2) => {
+      collect(env, App(Abs(x, tpe, t2), t1))
+    }
+    
     case _ => throw new InternalError
   }
   
