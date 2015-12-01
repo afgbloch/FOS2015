@@ -83,7 +83,7 @@ object Infer {
       val tpe1 = treeTp1 match {
         case EmptyTypeTree() => TypeVar(freshType)
         case _ => typeCast(treeTp1)
-      }
+      } 
       
       val env2 = (x, TypeScheme(List(), tpe1)) :: env
       val (tpe2, ct) = collect(env2, t1)
@@ -101,7 +101,7 @@ object Infer {
     case Let(x, EmptyTypeTree(), v, t1) => {
       val (s1, c1) = collect(env, v)
       def f1 = unify(c1)
-  
+
       val s2 = f1(s1)
       
       var env2 = env.map {
@@ -113,8 +113,9 @@ object Infer {
           (x._1, TypeScheme(params2, f1(x._2.tp)))
         }
       }
-      
+
       env2 = (x , TypeScheme(extract(s2, env2, Nil), s2)) :: env2
+
       val (tpe2, ct) = collect(env2, t1)
       (tpe2, ct)
     }
@@ -131,17 +132,17 @@ object Infer {
   def unify(c: List[Constraint]): Type => Type =  c match {
     case Nil => x => x
     case (tpe1, tpe2)::xs if(tpe1 == tpe2) => unify(xs) 
-    case (tpe1@TypeVar(name), tpe2)::xs  if(!appear(tpe1, tpe2)) => {
+    case (tpe1@TypeVar(name1), tpe2)::xs  if(!appear(tpe1, tpe2)) => {
       def f1: Type => Type = {
-        case x if(x == tpe1) => tpe2
+        case TypeVar(name2) if(name1 == name2) => tpe2
         case FunType(x1, x2) => FunType(f1(x1), f1(x2))
         case x => x
       } 
       f1 andThen unify(xs.map(x => (f1(x._1), f1(x._2))))  
     }
-    case (tpe1, tpe2@TypeVar(name))::xs  if(!appear(tpe2, tpe1)) => {
+    case (tpe1, tpe2@TypeVar(name1))::xs  if(!appear(tpe2, tpe1)) => {
       def f1: Type => Type = {
-        case x if(x == tpe2) => tpe1
+        case TypeVar(name2) if(name1 == name2) => tpe1
         case FunType(x1, x2) => FunType(f1(x1), f1(x2))
         case x => x
       } 
@@ -152,9 +153,10 @@ object Infer {
     case (tpe1, tpe2)::xs => throw new TypeError("Could not unify: " + tpe1 + " with " + tpe2)
   }
   
-  def appear(tpe1: Type, tpe2: Type): Boolean = tpe2 match {
+  def appear(tpe1: TypeVar, tpe2: Type): Boolean = tpe2 match {
     case FunType(tpe21, tpe22) => appear(tpe1, tpe21) || appear(tpe1, tpe22)
-    case _ => tpe1 == tpe2
+    case TypeVar(name) => tpe1.name == name
+    case _ => false
   }
   
 }
