@@ -99,16 +99,18 @@ object Infer {
     }
     
     case Let(x, EmptyTypeTree(), v, t1) => {
-      val (s1, c) = collect(env, v)
-      def f1 = unify(c)
+      val (s1, c1) = collect(env, v)
+      def f1 = unify(c1)
   
       val s2 = f1(s1)
       
       var env2 = env.map {
         case x => {
-          val params2 = x._2.params.map(x => f1(x)).asInstanceOf[List[TypeVar]]
+          val params2 = x._2.params.map{x1 => f1(x1)}.filter{
+            case TypeVar(_) => true 
+            case _ => false
+          }.asInstanceOf[List[TypeVar]]
           (x._1, TypeScheme(params2, f1(x._2.tp)))
-          
         }
       }
       
