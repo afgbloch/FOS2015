@@ -72,7 +72,10 @@ object Infer {
     }
     
     case Var(name) => {
-      val ts = env.filter(e => e._1 == name).map(e => e._2).head
+      val ts = env.filter(e => e._1 == name).map(e => e._2) match {
+        case Nil => throw new TypeError("Var doesn't exist")
+        case x::xs => x
+      }
       (instantiate(ts), List())
     }
     
